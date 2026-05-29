@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MLBB Tactical Cooldown Board v6</title>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: #151f32;
+            --panel-bg: #1e293b;
+            --accent-color: #3b82f6;
+            --text-color: #f8fafc;
+            --cooldown-color: #ef4444;
+            --success-color: #10b981;
+            --purple-color: #a855f7;
+            --gold-color: #fbbf24;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 15px;
+        }
+
+        h2 { text-align: center; color: #38bdf8; margin: 5px 0 15px 0; font-size: 22px; }
+        
+        .mode-navigation { display: flex; justify-content: center; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+        .mode-btn {
+            background-color: var(--card-bg); color: #94a3b8; border: 1px solid #273549;
+            padding: 10px 16px; cursor: pointer; font-weight: bold; border-radius: 6px; transition: 0.2s; font-size: 14px;
+        }
+        .mode-btn.active { background-color: var(--accent-color); color: white; box-shadow: 0 0 10px rgba(59, 130, 246, 0.5); }
+        #btn-mode-learn.active { background-color: var(--purple-color); box-shadow: 0 0 10px rgba(168, 85, 247, 0.5); }
+
+        /* Поиск и категории на драфте */
+        .search-container { max-width: 900px; margin: 0 auto 15px auto; display: flex; flex-direction: column; gap: 10px; }
+        .search-input { width: 100%; padding: 10px 15px; background: #151f32; border: 1px solid #273549; border-radius: 6px; color: white; font-size: 14px; box-sizing: border-box; }
+        .search-input:focus { border-color: var(--accent-color); outline: none; }
+
+        .class-filters { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin-bottom: 15px; }
+        .filter-btn {
+            background: #1e293b; color: #cbd5e1; border: 1px solid #475569;
+            padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.1s;
+        }
+        .filter-btn.active { background: #38bdf8; color: #0b0f19; border-color: #38bdf8; }
+        .filter-btn.learn-active { background: var(--purple-color); color: white; border-color: var(--purple-color); }
+
+        /* Общая панель настроек боя */
+        .mass-control-panel {
+            background-color: #162235; border: 1px solid #23354f; border-radius: 8px; padding: 10px 15px; max-width: 1100px; margin: 0 auto 15px auto;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .mass-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+        .mass-title { font-size: 13px; font-weight: bold; color: #cbd5e1; }
+
+        .screen { display: none; }
+        .screen.active { display: block; }
+
+        .heroes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); gap: 10px; max-width: 900px; margin: 0 auto; }
+        .match-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 12px; max-width: 1100px; margin: 0 auto; }
+
+        /* Карточки драфта */
+        .hero-picker-card { background-color: var(--card-bg); border: 1px solid #273549; border-radius: 8px; padding: 8px; text-align: center; display: flex; flex-direction: column; justify-content: space-between; height: 90px; box-sizing: border-box; }
+        .hero-picker-card.selected { border-color: var(--accent-color); background: #1a2942; }
+        .hero-name-click { font-weight: bold; font-size: 13px; margin-bottom: 4px; cursor: pointer; padding: 6px; background: #1e293b; border-radius: 4px; user-select: none; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+        .hero-picker-card.selected .hero-name-click { background: var(--accent-color); color: white; }
+        .spell-select { width: 100%; padding: 3px; background: #0b0f19; color: white; border: 1px solid #273549; border-radius: 4px; font-size: 11px; }
+        
+        .action-btn { display: block; width: 220px; margin: 20px auto; padding: 12px; background-color: var(--success-color); color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; text-align: center; }
+
+        /* Карточки боя */
+        .match-card { background-color: var(--card-bg); border-radius: 8px; padding: 12px; border-left: 4px solid var(--cooldown-color); display: flex; flex-direction: column; gap: 8px; }
+        .card-top { display: flex; justify-content: space-between; align-items: center; }
+        .hero-name { font-size: 15px; font-weight: bold; display: flex; align-items: center; gap: 6px; }
+        .gossen-easter { font-size: 11px; color: var(--gold-color); font-weight: 900; background: rgba(251, 191, 36, 0.15); padding: 1px 4px; border-radius: 3px; border: 1px solid rgba(251, 191, 36, 0.3); }
+        .hero-class-badge { font-size: 10px; background: #334155; padding: 2px 6px; border-radius: 4px; color: #94a3b8; align-self: flex-start; }
+        
+        .level-selector { display: flex; gap: 2px; background: #0b0f19; padding: 2px; border-radius: 4px; }
+        .lvl-btn { background: none; border: none; color: #64748b; font-size: 11px; padding: 2px 5px; cursor: pointer; font-weight: bold; border-radius: 3px; }
+        .lvl-btn.active { background: var(--accent-color); color: white; }
+        .lvl-btn.active-cd { background: var(--success-color); color: white; }
+
+        /* Контейнер регулировки КД */
+        .hero-cd-modifier { background: #111827; border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
+        .cd-slider-header { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #94a3b8; }
+        .cd-slider-body { display: flex; align-items: center; gap: 10px; width: 100%; }
+        .slider-wrapper { flex: 1; display: flex; flex-direction: column; position: relative; }
+        
+        /* Отметки над ползунком */
+        .slider-ticks { display: flex; justify-content: space-between; padding: 0 4px; margin-bottom: 2px; font-size: 9px; color: #64748b; font-weight: bold; user-select: none; }
+        .slider-ticks span { position: relative; text-align: center; }
+
+        .hero-cd-modifier input[type="range"] { width: 100%; accent-color: var(--success-color); cursor: pointer; height: 4px; margin: 0; padding: 0; }
+        .cd-total-badge { background: #1f2937; color: #10b981; font-weight: bold; padding: 2px 5px; border-radius: 4px; font-size: 12px; border: 1px solid #374151; min-width: 32px; text-align: center; }
+        
+        .skills-compact-row { display: flex; gap: 8px; }
+        .skill-timer-btn { flex: 1; background: #1e293b; border: 1px solid #273549; color: white; padding: 8px; border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+        .skill-timer-btn.cooldown { background: #3b1414; border-color: #7f1d1d; }
+        .time-counter { font-size: 15px; font-weight: bold; color: #fca5a5; display: flex; align-items: center; gap: 5px; }
+        .reset-x { background: #7f1d1d; border: none; color: white; border-radius: 3px; padding: 0 4px; font-size: 10px; }
+
+        .static-info-block { flex: 1; background: #1a2436; border: 1px solid #2d3d56; padding: 8px; border-radius: 6px; text-align: center; }
+        .static-label { font-size: 11px; color: #94a3b8; text-transform: uppercase; margin-bottom: 2px; }
+        .static-time { font-size: 18px; font-weight: bold; color: #38bdf8; }
+    </style>
+</head>
+<body>
+
+    <!-- ВЕРХНЯЯ НАВИГАЦИЯ -->
+    <div class="mode-navigation">
+        <button class="mode-btn active" id="btn-mode-draft">Выбор героев (Драфт)</button>
+        <button class="mode-btn" id="btn-mode-timer">1. Интерактивные Таймеры</button>
+        <button class="mode-btn" id="btn-mode-static">2. Компактный Справочник</button>
+        <button class="mode-btn" id="btn-mode-learn">🧠 База знаний (Обучение)</button>
+    </div>
+
+    <!-- ЭКРАН 1: ВЫБОР ГЕРОЕВ -->
+    <div id="screen-draft" class="screen active">
+        <div class="search-container">
+            <input type="text" id="draft-search" class="search-input" placeholder="Поиск (ищет даже с 1 ошибкой или по сленгу: Гусь, Лсс, Тигр, Хая...)">
+            <div class="class-filters" id="draft-classes">
+                <button class="filter-btn active" onclick="filterDraftClass('all')">Все</button>
+                <button class="filter-btn" onclick="filterDraftClass('marksman')">🏹 Стрелки</button>
+                <button class="filter-btn" onclick="filterDraftClass('fighter')">⚔️ Бойцы</button>
+                <button class="filter-btn" onclick="filterDraftClass('mage')">🔮 Маги</button>
+                <button class="filter-btn" onclick="filterDraftClass('support')">🕊️ Саппорты</button>
+                <button class="filter-btn" onclick="filterDraftClass('tank')">🛡️ Танки</button>
+                <button class="filter-btn" onclick="filterDraftClass('assassin')">🗡️ Убийцы</button>
+            </div>
+        </div>
+
+        <div class="heroes-grid" id="heroes-pool"></div>
+        <button class="action-btn" id="start-match-btn">В бой! (0/5)</button>
+    </div>
+
+    <!-- ЭКРАН 2: ТЕКУЩИЙ МАТЧ (ТАЙМЕРЫ) -->
+    <div id="screen-match-timer" class="screen">
+        <div class="mass-control-panel">
+            <div class="mass-row">
+                <span class="mass-title">Уровень ульты ВСЕМ врагам:</span>
+                <div class="level-selector" id="global-timer-lvl-btns">
+                    <button class="lvl-btn" onclick="setGlobalUltLvl(0)">Ур. 1</button>
+                    <button class="lvl-btn" onclick="setGlobalUltLvl(1)">Ур. 2</button>
+                    <button class="lvl-btn" onclick="setGlobalUltLvl(2)">Ур. 3</button>
+                </div>
+            </div>
+            <div class="mass-row">
+                <span class="mass-title">Глобальный КД ВСЕМ врагам (сборка):</span>
+                <div class="level-selector" id="global-timer-cd-btns">
+                    <button class="lvl-btn" onclick="setGlobalCd(0)">0%</button>
+                    <button class="lvl-btn" onclick="setGlobalCd(10)">10%</button>
+                    <button class="lvl-btn" onclick="setGlobalCd(30)">30%</button>
+                    <button class="lvl-btn" onclick="setGlobalCd(45)">45%</button>
+                </div>
+            </div>
+        </div>
+        <h2>Режим: Интерактивная доска таймеров</h2>
+        <div class="match-grid" id="grid-timer-mode"></div>
+    </div>
+
+    <!-- ЭКРАН 3: ТЕКУЩИЙ МАТЧ (СПРАВОЧНИК) -->
+    <div id="screen-match-static" class="screen">
+        <div class="mass-control-panel">
+            <div class="mass-row">
+                <span class="mass-title">Уровень ульты ВСЕМ врагам:</span>
+                <div class="level-selector" id="global-static-lvl-btns">
+                    <button class="lvl-btn" onclick="setGlobalUltLvl(0)">Ур. 1</button>
+                    <button class="lvl-btn" onclick="setGlobalUltLvl(1)">Ур. 2</button>
+                    <button class="lvl-btn" onclick="setGlobalUltLvl(2)">Ур. 3</button>
+                </div>
+            </div>
+            <div class="mass-row">
+                <span class="mass-title">Глобальный КД ВСЕМ врагам (сборка):</span>
+                <div class="level-selector" id="global-static-cd-btns">
+                    <button class="lvl-btn" onclick="setGlobalCd(0)">0%</button>
+                    <button class="lvl-btn" onclick="setGlobalCd(10)">10%</button>
+                    <button class="lvl-btn" onclick="setGlobalCd(30)">30%</button>
+                    <button class="lvl-btn" onclick="setGlobalCd(45)">45%</button>
+                </div>
+            </div>
+        </div>
+        <h2>Режим: Быстрый справочник КД</h2>
+        <div class="match-grid" id="grid-static-mode"></div>
+    </div>
+
+    <!-- ЭКРАН 4: БАЗА ЗНАНИЙ И ОБУЧЕНИЕ -->
+    <div id="screen-match-learn" class="screen">
+        <h2>Изучение и запоминание базовых КД</h2>
+        <div class="class-filters">
+            <button class="filter-btn learn-active" id="fl-all" onclick="filterLearnClass('all')">Все классы</button>
+            <button class="filter-btn" id="fl-tank" onclick="filterLearnClass('tank')">🛡️ Танки</button>
+            <button class="filter-btn" id="fl-fighter" onclick="filterLearnClass('fighter')">⚔️ Бойцы</button>
+            <button class="filter-btn" id="fl-assassin" onclick="filterLearnClass('assassin')">🗡️ Убийцы</button>
+            <button class="filter-btn" id="fl-mage" onclick="filterLearnClass('mage')">🔮 Маги</button>
+            <button class="filter-btn" id="fl-marksman" onclick="filterLearnClass('marksman')">🏹 Стрелки</button>
+            <button class="filter-btn" id="fl-support" onclick="filterLearnClass('support')">🕊️ Саппорты</button>
+        </div>
+        <div class="match-grid" id="grid-learn-mode"></div>
+    </div>
+
+    <script>
+        const spellsDatabase = {
+            flicker: { name: 'Вспышка', cd: 120 },
+            purify: { name: 'Очищение', cd: 90 },
+            petrify: { name: 'Оцепенение', cd: 75 },
+            flameshot: { name: 'Огненный выстрел', cd: 50 },
+            sprint: { name: 'Спринт', cd: 100 },
+            retribution: { name: 'Смайт', cd: 35 }
+        };
+
+        const heroesDatabase = [
+            // Стрелки
+            { id: 'lesley', name: 'Лесли', role: 'marksman', ult: [40, 40, 40], aliases: ['лесли'] },
+            { id: 'beatrix', name: 'Беатрис', role: 'marksman', ult: [32, 28, 24], aliases: ['беатрис', 'беа'] },
+            { id: 'kimmy', name: 'Кимми', role: 'marksman', ult: [50, 45, 40], aliases: ['кимми'] },
+            { id: 'leosunshin', name: 'Ли сун син', role: 'marksman', ult: [60, 60, 60], aliases: ['ли сун син', 'лсс'] },
+            { id: 'moskov', name: 'Москов', role: 'marksman', ult: [55, 50, 45], aliases: ['москов', 'моська'] },
+            { id: 'wanwan', name: 'Ванван', role: 'marksman', ult: [50, 46, 42], aliases: ['wanwan', 'вв'] },
+            { id: 'melissa', name: 'Мелисса', role: 'marksman', ult: [50, 45, 40], aliases: ['мелисса'] },
+            { id: 'obsidia', name: 'Обсидия', role: 'marksman', ult: [40, 35, 30], aliases: ['обсидия'] },
+            { id: 'edith', name: 'Эдит', role: 'marksman', ult: [40, 37, 34], aliases: ['эдит'] },
+            { id: 'hanabi', name: 'Ханаби', role: 'marksman', ult: [40, 35, 30], aliases: ['ханаби'] },
+            { id: 'karrie', name: 'Кэрри', role: 'marksman', ult: [35, 32, 29], aliases: ['кэрри'] },
+            { id: 'layla', name: 'Лейла', role: 'marksman', ult: [37, 32, 27], aliases: ['лейла'] },
+            // Бойцы
+            { id: 'balmond', name: 'Бальмонд', role: 'fighter', ult: [34, 29, 24], aliases: ['бальмонд', 'балык'] },
+            { id: 'zilong_f', name: 'Зилонг', role: 'fighter', ult: [35, 21, 27], aliases: ['зилонг', 'зилка'] },
+            { id: 'freya', name: 'Фрейя', role: 'fighter', ult: [34, 30, 26], aliases: ['фрейя'] },
+            { id: 'grock_f', name: 'Грок', role: 'fighter', ult: [55, 50, 45], aliases: ['грок'] },
+            { id: 'xbourg', name: 'Иксборг', role: 'fighter', ult: [30, 27, 24], aliases: ['иксборг', 'борг'] },
+            { id: 'yin_f', name: 'Инь', role: 'fighter', ult: [52, 48, 44], aliases: ['инь'] },
+            { id: 'kalea_f', name: 'Калеа', role: 'fighter', ult: [56, 52, 48], aliases: ['калеа'] },
+            { id: 'badang', name: 'Баданг', role: 'fighter', ult: [45, 40, 35], aliases: ['баданг'] },
+            { id: 'alucard_f', name: 'Алукард', role: 'fighter', ult: [40, 35, 30], aliases: ['алукард', 'алик'] },
+            { id: 'bane_f', name: 'Бэйн', role: 'fighter', ult: [40, 35, 30], aliases: ['бэйн'] },
+            { id: 'chou', name: 'Чу', role: 'fighter', ult: [36, 33, 30], aliases: ['чу'] },
+            { id: 'sun', name: 'Сан', role: 'fighter', ult: [36, 32, 28], aliases: ['сан', 'обезьяна'] },
+            { id: 'hilda_f', name: 'Хильда', role: 'fighter', ult: [32, 28, 24], aliases: ['хильда'] },
+            { id: 'lapulapu', name: 'Лапу лапу', role: 'fighter', ult: [30, 27, 24], aliases: ['лапу лапу', 'лапу', 'лл'] },
+            { id: 'gatot_f', name: 'Гатоткача', role: 'fighter', ult: [54, 50, 46], aliases: ['гатоткача', 'гамот'] },
+            { id: 'argus', name: 'Аргус', role: 'fighter', ult: [60, 55, 50], aliases: ['аргус'] },
+            { id: 'jawhead', name: 'Кусака', role: 'fighter', ult: [35, 30, 25], aliases: ['кусака'] },
+            { id: 'martis', name: 'Мартис', role: 'fighter', ult: [36, 32, 28], aliases: ['мартис'] },
+            { id: 'kaja_f', name: 'Кайя', role: 'fighter', ult: [60, 60, 60], aliases: ['кайя'] },
+            { id: 'aldous', name: 'Алдос', role: 'fighter', ult: [60, 55, 50], aliases: ['алдос', 'одноклассник'] },
+            { id: 'thamuz', name: 'Тамуз', role: 'fighter', ult: [38, 34, 30], aliases: ['тамуз'] },
+            { id: 'minsitthar', name: 'Минситтар', role: 'fighter', ult: [55, 50, 45], aliases: ['минситтар', 'минсит'] },
+            { id: 'guinevere', name: 'Гвиневра', role: 'fighter', ult: [52, 46, 40], aliases: ['гвиневра', 'гвин'] },
+            { id: 'terizla_f', name: 'Тэризла', role: 'fighter', ult: [50, 43, 36], aliases: ['тэризла', 'теризла'] },
+            { id: 'dyrroth', name: 'Дариус', role: 'fighter', ult: [36, 32, 28], aliases: ['дариус', 'дарсик'] },
+            { id: 'masha_f', name: 'Маша', role: 'fighter', ult: [35, 35, 35], aliases: ['маша'] },
+            { id: 'silvanna', name: 'Сильвана', role: 'fighter', ult: [52, 48, 44], aliases: ['сильвана'] },
+            { id: 'yu_zhong', name: 'Чонг', role: 'fighter', ult: [85, 75, 65], aliases: ['чонг', 'дракон', 'ючонг'] },
+            { id: 'benedetta_f', name: 'Бенедетта', role: 'fighter', ult: [45, 40, 35], aliases: ['бенедетта', 'беня'] },
+            { id: 'khaleed', name: 'Халид', role: 'fighter', ult: [46, 42, 38], aliases: ['халид'] },
+            { id: 'barats', name: 'Бартс', role: 'fighter', ult: [50, 45, 40], aliases: ['бартс', 'барац'] },
+            { id: 'aulus', name: 'Аулус', role: 'fighter', ult: [50, 45, 40], aliases: ['аулус'] },
+            { id: 'fredrinn', name: 'Фредрин', role: 'fighter', ult: [30, 27, 24], aliases: ['фредрин', 'фред'] },
+            { id: 'cici', name: 'Чича', role: 'fighter', ult: [40, 36, 32], aliases: ['чича', 'сиси'] },
+            // Маги
+            { id: 'nana', name: 'Нана', role: 'mage', ult: [36, 32, 28], aliases: ['нана'] },
+            { id: 'eudora', name: 'Эйдора', role: 'mage', ult: [32, 29, 26], aliases: ['эйдора'] },
+            { id: 'gord', name: 'Горд', role: 'mage', ult: [44, 40, 36], aliases: ['горд'] },
+            { id: 'harley_m', name: 'Харли', role: 'mage', ult: [36, 33, 30], aliases: ['харли'] },
+            { id: 'zhask', name: 'Заск', role: 'mage', ult: [48, 44, 40], aliases: ['заск'] },
+            { id: 'valir', name: 'Валир', role: 'mage', ult: [36, 33, 30], aliases: ['валир'] },
+            { id: 'vale', name: 'Вэйл', role: 'mage', ult: [36, 33, 30], aliases: ['вэйл', 'вейл'] },
+            { id: 'lunox', name: 'Люнокс', role: 'mage', ult: [30, 26, 22], aliases: ['люнокс', 'люня'] },
+            { id: 'harith', name: 'Харит', role: 'mage', ult: [40, 35, 30], aliases: ['харит'] },
+            { id: 'faramis_m', name: 'Фарамис', role: 'mage', ult: [90, 80, 70], aliases: ['фарамис', 'фара'] },
+            { id: 'wu_zetian', name: 'Цзэ тянь', role: 'mage', ult: [90, 80, 70], aliases: ['цзэ тянь', 'цзэ'] },
+            { id: 'aurora', name: 'Аврора', role: 'mage', ult: [50, 45, 40], aliases: ['аврора'] },
+            { id: 'zhuxin', name: 'Чжу синь', role: 'mage', ult: [60, 55, 50], aliases: ['чжу синь', 'чжу'] },
+            { id: 'alice_m', name: 'Алиса', role: 'mage', ult: [60, 55, 50], aliases: ['алиса'] },
+            { id: 'bane_m', name: 'Бэйн', role: 'mage', ult: [40, 35, 30], aliases: ['бэйн'] },
+            { id: 'kagura', name: 'Кагура', role: 'mage', ult: [36, 33, 30], aliases: ['кагура', 'кага'] },
+            { id: 'cyclops', name: 'Циклоп', role: 'mage', ult: [26, 22, 18], aliases: ['циклоп', 'одноглазый'] },
+            { id: 'vexsana', name: 'Вексана', role: 'mage', ult: [60, 53, 46], aliases: ['вексана', 'векса'] },
+            { id: 'odette', name: 'Одетта', role: 'mage', ult: [50, 45, 40], aliases: ['одетта', 'одета'] },
+            { id: 'pharsa', name: 'Фаша', role: 'mage', ult: [36, 33, 30], aliases: ['фаша'] },
+            { id: 'kadita_m', name: 'Кадита', role: 'mage', ult: [40, 36, 32], aliases: ['кадита', 'рыба'] },
+            { id: 'lylia', name: 'Лилия', role: 'mage', ult: [45, 40, 35], aliases: ['лилия'] },
+            { id: 'cecilion', name: 'Сесилион', role: 'mage', ult: [44, 41, 38], aliases: ['сесилион', 'сесиль'] },
+            { id: 'luoyi', name: 'Ло йи', role: 'mage', ult: [60, 60, 60], aliases: ['ло йи', 'лои'] },
+            { id: 'yve', name: 'Ив', role: 'mage', ult: [60, 60, 60], aliases: ['ив'] },
+            { id: 'xavier', name: 'Ксавьер', role: 'mage', ult: [56, 56, 56], aliases: ['ксавьер', 'икс'] },
+            { id: 'novaria', name: 'Новария', role: 'mage', ult: [48, 44, 40], aliases: ['новария'] },
+            // Поддержка
+            { id: 'rafaela', name: 'Рафаэль', role: 'support', ult: [38, 34, 30], aliases: ['рафаэль', 'рафа'] },
+            { id: 'angela', name: 'Ангела', role: 'support', ult: [60, 60, 60], aliases: ['ангела', 'анжела'] },
+            { id: 'johnson_s', name: 'Джонсон', role: 'support', ult: [36, 33, 30], aliases: ['джонсон', 'машина', 'жига'] },
+            { id: 'estes', name: 'Эстэс', role: 'support', ult: [55, 50, 45], aliases: ['эстэс', 'эстес'] },
+            { id: 'minotaur_s', name: 'Минотавр', role: 'support', ult: [60, 55, 50], aliases: ['минотавр', 'мино', 'бык'] },
+            { id: 'lolita', name: 'Лолита', role: 'support', ult: [55, 50, 45], aliases: ['лолита', 'лоля'] },
+            { id: 'diggie', name: 'Дигги', role: 'support', ult: [76, 70, 64], aliases: ['дигги', 'птица'] },
+            { id: 'kaja_s', name: 'Кайя', role: 'support', ult: [60, 60, 60], aliases: ['кайя'] },
+            { id: 'faramis_s', name: 'Фарамис', role: 'support', ult: [90, 80, 70], aliases: ['фарамис', 'фара'] },
+            { id: 'carmilla', name: 'Кармилла', role: 'support', ult: [60, 52, 44], aliases: ['кармилла', 'карма'] },
+            { id: 'mathilda', name: 'Матильда', role: 'support', ult: [65, 65, 65], aliases: ['матильда', 'мотя'] },
+            { id: 'florin', name: 'Флорин', role: 'support', ult: [70, 70, 70], aliases: ['флорин', 'флора'] },
+            { id: 'chip', name: 'Чип', role: 'support', ult: [70, 70, 70], aliases: ['чип'] },
+            { id: 'kalea_s', name: 'Калеа', role: 'support', ult: [56, 52, 48], aliases: ['калеа'] },
+            { id: 'marcel', name: 'Марсель', role: 'support', ult: [74, 68, 62], aliases: ['марсель'] },
+            // Танки
+            { id: 'tigreal', name: 'Тигрил', role: 'tank', ult: [55, 50, 45], aliases: ['тигрил', 'тигр'] },
+            { id: 'alice_t', name: 'Алиса', role: 'tank', ult: [60, 55, 50], aliases: ['アリス', 'алиса'] },
+            { id: 'akai', name: 'Акай', role: 'tank', ult: [55, 50, 45], aliases: ['акай', 'панда'] },
+            { id: 'franco', name: 'Франко', role: 'tank', ult: [62, 55, 48], aliases: ['франко', 'хук'] },
+            { id: 'hilda_t', name: 'Хильда', role: 'tank', ult: [32, 28, 24], aliases: ['хильда'] },
+            { id: 'gatot_t', name: 'Гатоткача', role: 'tank', ult: [54, 50, 46], aliases: ['гатоткача'] },
+            { id: 'grock_t', name: 'Грок', role: 'tank', ult: [55, 50, 45], aliases: ['grock', 'грок'] },
+            { id: 'hylos', name: 'Хилос', role: 'tank', ult: [40, 36, 32], aliases: ['хилос', 'конь'] },
+            { id: 'uranus', name: 'Уранус', role: 'tank', ult: [42, 39, 36], aliases: ['уранус', 'ур'] },
+            { id: 'belerick', name: 'Белерик', role: 'tank', ult: [50, 46, 42], aliases: ['белерик', 'дерево'] },
+            { id: 'khufra', name: 'Хуфра', role: 'tank', ult: [50, 45, 40], aliases: ['хуфра', 'мяч'] },
+            { id: 'esmeralda', name: 'Эсмеральда', role: 'tank', ult: [30, 25, 20], aliases: ['эсмеральда', 'эсме'] },
+            { id: 'terizla_t', name: 'Тэризла', role: 'tank', ult: [50, 43, 36], aliases: ['тэризла'] },
+            { id: 'baxia', name: 'Баксий', role: 'tank', ult: [40, 35, 30], aliases: ['баксий'] },
+            { id: 'masha_t', name: 'Маша', role: 'tank', ult: [35, 35, 35], aliases: ['маша'] },
+            { id: 'atlas', name: 'Атлас', role: 'tank', ult: [55, 50, 45], aliases: ['атлас'] },
+            // Убийцы
+            { id: 'harley_a', name: 'Харли', role: 'assassin', ult: [36, 33, 30], aliases: ['харли'] },
+            { id: 'gossen', name: 'Госсен', role: 'assassin', ult: [24, 20, 16], aliases: ['госсен', 'гусь'] },
+            { id: 'lancelot', name: 'Ланселот', role: 'assassin', ult: [36, 32, 28], aliases: ['ланселот', 'ланс'] },
+            { id: 'hayabusa', name: 'Хаябуса', role: 'assassin', ult: [40, 40, 40], aliases: ['хаябуса', 'хая'] },
+            { id: 'fanny', name: 'Фанни', role: 'assassin', ult: [35, 30, 25], aliases: ['фанни', 'фаня'] },
+            { id: 'saber', name: 'Сабер', role: 'assassin', ult: [44, 40, 36], aliases: ['сабер'] },
+            { id: 'alucard_a', name: 'Алукард', role: 'assassin', ult: [40, 40, 40], aliases: ['алукард'] },
+            { id: 'zilong_a', name: 'Зилонг', role: 'assassin', ult: [35, 31, 27], aliases: ['зилонг'] },
+            { id: 'helcurt', name: 'Хелкарт', role: 'assassin', ult: [60, 55, 50], aliases: ['хелкарт', 'хел'] },
+            { id: 'hanzo', name: 'Ханзо', role: 'assassin', ult: [24, 20, 16], aliases: ['ханзо'] },
+            { id: 'ling', name: 'Линг', role: 'assassin', ult: [52, 49, 46], aliases: ['линг'] },
+            { id: 'benedetta_a', name: 'Бенедетта', role: 'assassin', ult: [45, 40, 35], aliases: ['бенедетта'] },
+            { id: 'amon', name: 'Эймон', role: 'assassin', ult: [50, 45, 40], aliases: ['эймон'] },
+            { id: 'nolan', name: 'Нолан', role: 'assassin', ult: [21, 18, 15], aliases: ['нолан'] },
+            { id: 'karina', name: 'Карина', role: 'assassin', ult: [34, 30, 26], aliases: ['карина'] },
+            { id: 'natalia', name: 'Наталья', role: 'assassin', ult: [30, 30, 30], aliases: ['наталья', 'ната'] },
+            { id: 'leosunshin_a', name: 'Ли сун син', role: 'assassin', ult: [60, 60, 60], aliases: ['ли сун син', 'лсс'] },
+            { id: 'lesley_a', name: 'Лесли', role: 'assassin', ult: [40, 40, 40], aliases: ['лесли'] },
+            { id: 'kadita_a', name: 'Кадита', role: 'assassin', ult: [40, 36, 32], aliases: ['кадита'] },
+            { id: 'yin_a', name: 'Инь', role: 'assassin', ult: [52, 48, 44], aliases: ['инь'] },
+            { id: 'joy', name: 'Джой', role: 'assassin', ult: [28, 28, 28], aliases: ['джой'] },
+            { id: 'arlott', name: 'Арлотт', role: 'assassin', ult: [24, 21, 18], aliases: ['арлотт'] }
+        ];
+
+        const roleLabels = { tank: 'Танк', fighter: 'Боец', assassin: 'Убийца', mage: 'Маг', marksman: 'Стрелок', support: 'Поддержка' };
+
+        let selectedHeroes = []; 
+        let activeTimers = {}; 
+        let currentActiveMode = 'draft'; 
+        let currentDraftFilter = 'all';
+        let currentLearnFilter = 'all';
+        
+        let globalCdValue = 0; 
+
+        let learnUiState = {}; 
+        heroesDatabase.forEach(h => { learnUiState[h.id] = 0; });
+
+        function levenshtein(a, b) {
+            const matrix = [];
+            for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+            for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+            for (let i = 1; i <= b.length; i++) {
+                for (let j = 1; j <= a.length; j++) {
+                    if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                        matrix[i][j] = matrix[i - 1][j - 1];
+                    } else {
+                        matrix[i][j] = Math.min(matrix[i - 1][j - 1] + 1, Math.min(matrix[i][j - 1] + 1, matrix[i - 1][j] + 1));
+                    }
+                }
+            }
+            return matrix[b.length][a.length];
+        }
+
+        function buildDraftPool() {
+            const pool = document.getElementById('heroes-pool');
+            pool.innerHTML = '';
+            const searchText = document.getElementById('draft-search').value.toLowerCase().trim();
+            let processedList = [...heroesDatabase].sort((a, b) => a.name.localeCompare(b.name));
+
+            if (currentDraftFilter !== 'all') {
+                processedList = processedList.filter(h => h.role === currentDraftFilter);
+            }
+
+            if (searchText.length > 0) {
+                processedList = processedList.filter(hero => {
+                    if (hero.name.toLowerCase().includes(searchText)) return true;
+                    if (hero.aliases.some(alias => alias.includes(searchText))) return true;
+                    const words = hero.name.toLowerCase().split(' ');
+                    for (let word of words) {
+                        if (levenshtein(word, searchText) <= 1) return true;
+                    }
+                    for (let alias of hero.aliases) {
+                        if (levenshtein(alias, searchText) <= 1) return true;
+                    }
+                    return false;
+                });
+            }
+
+            processedList.forEach(hero => {
+                const isSelected = selectedHeroes.some(h => h.id === hero.id);
+                const card = document.createElement('div');
+                card.className = `hero-picker-card ${isSelected ? 'selected' : ''}`;
+                let options = Object.keys(spellsDatabase).map(k => `<option value="${k}">${spellsDatabase[k].name}</option>`).join('');
+                
+                card.innerHTML = `
+                    <div class="hero-name-click" title="${hero.name}">${hero.name} ${hero.id === 'gossen' ? '<span style="font-size:10px; color:var(--gold-color)">1337</span>' : ''}</div>
+                    <select class="spell-select" id="draft-spell-${hero.id}">${options}</select>
+                `;
+
+                const existing = selectedHeroes.find(h => h.id === hero.id);
+                if (existing) card.querySelector('.spell-select').value = existing.spellKey;
+
+                card.querySelector('.hero-name-click').addEventListener('click', () => {
+                    const index = selectedHeroes.findIndex(h => h.id === hero.id);
+                    if (index > -1) {
+                        card.classList.remove('selected');
+                        selectedHeroes.splice(index, 1);
+                    } else if (selectedHeroes.length < 5) {
+                        card.classList.add('selected');
+                        selectedHeroes.push({
+                            id: hero.id,
+                            spellKey: card.querySelector('.spell-select').value,
+                            ultLvl: 0, 
+                            localCdPercent: 0 
+                        });
+                    }
+                    document.getElementById('start-match-btn').innerText = `В бой! (${selectedHeroes.length}/5)`;
+                });
+
+                card.querySelector('.spell-select').addEventListener('change', (e) => {
+                    const heroState = selectedHeroes.find(h => h.id === hero.id);
+                    if (heroState) heroState.spellKey = e.target.value;
+                });
+
+                pool.appendChild(card);
+            });
+        }
+
+        function filterDraftClass(className) {
+            currentDraftFilter = className;
+            document.querySelectorAll('#draft-classes .filter-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            buildDraftPool();
+        }
+
+        document.getElementById('draft-search').addEventListener('input', buildDraftPool);
+
+        // НАВИГАЦИЯ
+        document.getElementById('btn-mode-draft').addEventListener('click', () => { switchMode('draft'); });
+        document.getElementById('btn-mode-timer').addEventListener('click', () => { if (selectedHeroes.length > 0) switchMode('timer'); else alert('Сначала выберите героев!'); });
+        document.getElementById('btn-mode-static').addEventListener('click', () => { if (selectedHeroes.length > 0) switchMode('static'); else alert('Сначала выберите героев!'); });
+        document.getElementById('btn-mode-learn').addEventListener('click', () => { switchMode('learn'); });
+        document.getElementById('start-match-btn').addEventListener('click', () => { if (selectedHeroes.length === 0) return alert('Выберите героев!'); switchMode('timer'); });
+
+        function switchMode(mode) {
+            currentActiveMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`btn-mode-${mode}`).classList.add('active');
+            renderActiveScreens();
+        }
+
+        function getHeroTotalCd(heroState) {
+            let total = globalCdValue + heroState.localCdPercent;
+            return total > 45 ? 45 : total;
+        }
+
+        function calculateFinalCd(heroState, baseCd) {
+            let cdPercent = getHeroTotalCd(heroState);
+            let final = Math.round(baseCd * (1 - cdPercent / 100));
+            return final < 1 ? 1 : final;
+        }
+
+        function updateMassPanelsUi() {
+            ['timer', 'static'].forEach(m => {
+                const cdContainer = document.getElementById(`global-${m}-cd-btns`);
+                if(cdContainer) {
+                    cdContainer.querySelectorAll('.lvl-btn').forEach(b => {
+                        b.classList.toggle('active-cd', parseInt(b.innerText) === globalCdValue);
+                    });
+                }
+            });
+        }
+
+        function renderActiveScreens() {
+            document.getElementById('screen-draft').classList.toggle('active', currentActiveMode === 'draft');
+            document.getElementById('screen-match-timer').classList.toggle('active', currentActiveMode === 'timer');
+            document.getElementById('screen-match-static').classList.toggle('active', currentActiveMode === 'static');
+            document.getElementById('screen-match-learn').classList.toggle('active', currentActiveMode === 'learn');
+
+            updateMassPanelsUi();
+
+            if (currentActiveMode === 'draft') buildDraftPool();
+            if (currentActiveMode === 'timer') buildTimerInterface();
+            if (currentActiveMode === 'static') buildStaticInterface();
+            if (currentActiveMode === 'learn') buildLearnInterface();
+        }
+
+        function setGlobalUltLvl(lvlIndex) {
+            selectedHeroes.forEach(h => { h.ultLvl = lvlIndex; });
+            renderActiveScreens();
+        }
+
+        function setGlobalCd(cdVal) {
+            globalCdValue = cdVal;
+            renderActiveScreens();
+        }
+
+        function setHeroUltLvl(heroId, lvlIndex) {
+            const hero = selectedHeroes.find(h => h.id === heroId);
+            if (hero) { hero.ultLvl = lvlIndex; renderActiveScreens(); }
+        }
+
+        function handleLocalCdChange(heroId, val) {
+            const hero = selectedHeroes.find(h => h.id === heroId);
+            if (hero) {
+                hero.localCdPercent = parseInt(val);
+                renderActiveScreens();
+            }
+        }
+
+        // РЕЖИМ 1: ТАЙМЕРЫ (С ОТМЕТКАМИ)
+        function buildTimerInterface() {
+            const grid = document.getElementById('grid-timer-mode');
+            grid.innerHTML = '';
+            selectedHeroes.forEach(hState => {
+                const hero = heroesDatabase.find(h => h.id === hState.id);
+                const spell = spellsDatabase[hState.spellKey];
+                const baseUlt = hero.ult[hState.ultLvl];
+                
+                const card = document.createElement('div');
+                card.className = 'match-card';
+                card.innerHTML = `
+                    <div class="card-top">
+                        <span class="hero-name">
+                            ${hero.name} 
+                            ${hero.id === 'gossen' ? '<span class="gossen-easter">1337</span>' : ''}
+                        </span>
+                        <div class="level-selector">
+                            <button class="lvl-btn ${hState.ultLvl===0?'active':''}" onclick="setHeroUltLvl('${hState.id}', 0)">Ур.1</button>
+                            <button class="lvl-btn ${hState.ultLvl===1?'active':''}" onclick="setHeroUltLvl('${hState.id}', 1)">Ур.2</button>
+                            <button class="lvl-btn ${hState.ultLvl===2?'active':''}" onclick="setHeroUltLvl('${hState.id}', 2)">Ур.3</button>
+                        </div>
+                    </div>
+                    
+                    <div class="hero-cd-modifier">
+                        <div class="cd-slider-header">
+                            <span>Соло КД сборки:</span>
+                        </div>
+                        <div class="cd-slider-body">
+                            <div class="slider-wrapper">
+                                <div class="slider-ticks">
+                                    <span>0%</span>
+                                    <span>15%</span>
+                                    <span>30%</span>
+                                    <span>45%</span>
+                                </div>
+                                <input type="range" min="0" max="45" step="5" value="${hState.localCdPercent}" oninput="handleLocalCdChange('${hState.id}', this.value)">
+                            </div>
+                            <div class="cd-total-badge" title="Общий КД (Глобальный + Соло. Макс 45%)">${getHeroTotalCd(hState)}%</div>
+                        </div>
+                    </div>
+
+                    <div class="skills-compact-row">
+                        <button class="skill-timer-btn" id="t-btn-ult-${hState.id}">
+                            <span id="t-lbl-ult-${hState.id}">Ультим. (${calculateFinalCd(hState, baseUlt)}с)</span>
+                            <span class="time-counter" id="t-val-ult-${hState.id}">Ready</span>
+                        </button>
+                        <button class="skill-timer-btn" id="t-btn-spell-${hState.id}">
+                            <span id="t-lbl-spell-${hState.id}">${spell.name} (${calculateFinalCd(hState, spell.cd)}с)</span>
+                            <span class="time-counter" id="t-val-spell-${hState.id}">Ready</span>
+                        </button>
+                    </div>
+                `;
+                grid.appendChild(card);
+                attachTimerLogic(hState, 'ult', baseUlt);
+                attachTimerLogic(hState, 'spell', spell.cd);
+            });
+        }
+
+        // РЕЖИМ 2: СПРАВОЧНИК (С ОТМЕТКАМИ)
+        function buildStaticInterface() {
+            const grid = document.getElementById('grid-static-mode');
+            grid.innerHTML = '';
+            selectedHeroes.forEach(hState => {
+                const hero = heroesDatabase.find(h => h.id === hState.id);
+                const spell = spellsDatabase[hState.spellKey];
+                const baseUlt = hero.ult[hState.ultLvl];
+
+                const card = document.createElement('div');
+                card.className = 'match-card';
+                card.style.borderLeftColor = '#38bdf8'; 
+                card.innerHTML = `
+                    <div class="card-top">
+                        <span class="hero-name">
+                            ${hero.name}
+                            ${hero.id === 'gossen' ? '<span class="gossen-easter">1337</span>' : ''}
+                        </span>
+                        <div class="level-selector">
+                            <button class="lvl-btn ${hState.ultLvl===0?'active':''}" onclick="setHeroUltLvl('${hState.id}', 0)">Ур.1</button>
+                            <button class="lvl-btn ${hState.ultLvl===1?'active':''}" onclick="setHeroUltLvl('${hState.id}', 1)">Ур.2</button>
+                            <button class="lvl-btn ${hState.ultLvl===2?'active':''}" onclick="setHeroUltLvl('${hState.id}', 2)">Ур.3</button>
+                        </div>
+                    </div>
+
+                    <div class="hero-cd-modifier">
+                        <div class="cd-slider-header">
+                            <span>Соло КД сборки:</span>
+                        </div>
+                        <div class="cd-slider-body">
+                            <div class="slider-wrapper">
+                                <div class="slider-ticks">
+                                    <span>0%</span>
+                                    <span>15%</span>
+                                    <span>30%</span>
+                                    <span>45%</span>
+                                </div>
+                                <input type="range" min="0" max="45" step="5" value="${hState.localCdPercent}" oninput="handleLocalCdChange('${hState.id}', this.value)">
+                            </div>
+                            <div class="cd-total-badge">${getHeroTotalCd(hState)}%</div>
+                        </div>
+                    </div>
+
+                    <div class="skills-compact-row">
+                        <div class="static-info-block">
+                            <div class="static-label">Ульта</div>
+                            <div class="static-time">${calculateFinalCd(hState, baseUlt)} сек</div>
+                        </div>
+                        <div class="static-info-block">
+                            <div class="static-label">${spell.name}</div>
+                            <div class="static-time">${calculateFinalCd(hState, spell.cd)} сек</div>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // РЕЖИМ 4: БАЗА ЗНАНИЙ
+        function filterLearnClass(className) {
+            currentLearnFilter = className;
+            document.querySelectorAll('#screen-match-learn .filter-btn').forEach(b => b.classList.remove('learn-active'));
+            document.getElementById(`fl-${className}`).classList.add('learn-active');
+            buildLearnInterface();
+        }
+
+        function changeLearnLvl(heroId, lvlIndex) {
+            learnUiState[heroId] = lvlIndex;
+            buildLearnInterface();
+        }
+
+        function buildLearnInterface() {
+            const grid = document.getElementById('grid-learn-mode');
+            grid.innerHTML = '';
+
+            let filtered = heroesDatabase.filter(h => currentLearnFilter === 'all' || h.role === currentLearnFilter);
+            filtered.sort((a, b) => a.name.localeCompare(b.name));
+
+            filtered.forEach(hero => {
+                const currentLvl = learnUiState[hero.id];
+                const card = document.createElement('div');
+                card.className = 'match-card';
+                card.style.borderLeftColor = 'var(--purple-color)';
+                
+                card.innerHTML = `
+                    <div class="card-top">
+                        <div class="hero-title-block">
+                            <span class="hero-name">
+                                ${hero.name}
+                                ${hero.id === 'gossen' ? '<span class="gossen-easter">1337</span>' : ''}
+                            </span>
+                            <span class="hero-class-badge">${roleLabels[hero.role]}</span>
+                        </div>
+                        <div class="level-selector">
+                            <button class="lvl-btn ${currentLvl===0?'active':''}" onclick="changeLearnLvl('${hero.id}', 0)">Ур.1</button>
+                            <button class="lvl-btn ${currentLvl===1?'active':''}" onclick="changeLearnLvl('${hero.id}', 1)">Ур.2</button>
+                            <button class="lvl-btn ${currentLvl===2?'active':''}" onclick="changeLearnLvl('${hero.id}', 2)">Ур.3</button>
+                        </div>
+                    </div>
+                    <div class="skills-compact-row">
+                        <div class="static-info-block" style="background: #231932; border-color: #49287a;">
+                            <div class="static-label" style="color: #c084fc;">Базовая Ульта</div>
+                            <div class="static-time" style="color: #d8b4fe;">${hero.ult[currentLvl]} сек</div>
+                        </div>
+                        <div class="static-info-block">
+                            <div class="static-label">Вспышка / Очищение</div>
+                            <div class="static-time">120с / 90с</div>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // ЛОГИКА ТАЙМЕРОВ
+        function attachTimerLogic(hState, skillType, baseCd) {
+            const btn = document.getElementById(`t-btn-${skillType}-${hState.id}`);
+            const display = document.getElementById(`t-val-${skillType}-${hState.id}`);
+            const tKey = `${hState.id}-${skillType}`;
+            let finalCd = calculateFinalCd(hState, baseCd);
+
+            if (activeTimers[tKey]) {
+                btn.classList.add('cooldown');
+                display.innerHTML = `${activeTimers[tKey].timeLeft}с <button class="reset-x" data-key="${tKey}">X</button>`;
+            } else {
+                btn.classList.remove('cooldown');
+                display.innerText = 'Ready';
+            }
+
+            btn.onclick = (e) => {
+                if (e.target.classList.contains('reset-x')) {
+                    clearInterval(activeTimers[tKey].intervalId);
+                    delete activeTimers[tKey];
+                    btn.classList.remove('cooldown');
+                    display.innerText = 'Ready';
+                    return;
+                }
+                if (btn.classList.contains('cooldown')) return;
+                btn.classList.add('cooldown');
+                
+                activeTimers[tKey] = {
+                    timeLeft: finalCd,
+                    intervalId: setInterval(() => {
+                        if (!activeTimers[tKey]) return;
+                        activeTimers[tKey].timeLeft--;
+                        if (activeTimers[tKey].timeLeft <= 0) {
+                            clearInterval(activeTimers[tKey].intervalId);
+                            delete activeTimers[tKey];
+                            const activeBtn = document.getElementById(`t-btn-${skillType}-${hState.id}`);
+                            const activeDisp = document.getElementById(`t-val-${skillType}-${hState.id}`);
+                            if (activeBtn && activeDisp) {
+                                activeBtn.classList.remove('cooldown');
+                                activeDisp.innerText = 'Ready';
+                            }
+                        } else {
+                            const activeDisp = document.getElementById(`t-val-${skillType}-${hState.id}`);
+                            if (activeDisp) activeDisp.innerHTML = `${activeTimers[tKey].timeLeft}с <button class="reset-x">X</button>`;
+                        }
+                    }, 1000)
+                };
+                display.innerHTML = `${activeTimers[tKey].timeLeft}с <button class="reset-x">X</button>`;
+            };
+        }
+    </script>
+</body>
+</html>
